@@ -3084,18 +3084,18 @@ macro_rules! for_each_i2c_master {
 /// - `$id`: the index of the UART instance
 /// - `$instance`: the name of the UART instance
 /// - `$sys`: the name of the instance as it is in the `esp_hal::system::Peripheral` enum.
-/// - `$rx`, `$tx`, `$cts`, `$rts`: signal names.
+/// - `$rx`, `$tx`, `$cts`, `$rts`, `$dtr`: signal names.
 ///
-/// Example data: `(0, UART0, Uart0, U0RXD, U0TXD, U0CTS, U0RTS)`
+/// Example data: `(0, UART0, Uart0, U0RXD, U0TXD, U0CTS, U0RTS, U0DTR)`
 #[macro_export]
 #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
 macro_rules! for_each_uart {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner_uart { $(($pattern) => $code;)* ($other : tt) => {}
-        } _for_each_inner_uart!((0, UART0, Uart0, U0RXD, U0TXD, U0CTS, U0RTS));
-        _for_each_inner_uart!((1, UART1, Uart1, U1RXD, U1TXD, U1CTS, U1RTS));
-        _for_each_inner_uart!((all(0, UART0, Uart0, U0RXD, U0TXD, U0CTS, U0RTS), (1,
-        UART1, Uart1, U1RXD, U1TXD, U1CTS, U1RTS)));
+        } _for_each_inner_uart!((0, UART0, Uart0, U0RXD, U0TXD, U0CTS, U0RTS, U0DTR));
+        _for_each_inner_uart!((1, UART1, Uart1, U1RXD, U1TXD, U1CTS, U1RTS, U1DTR));
+        _for_each_inner_uart!((all(0, UART0, Uart0, U0RXD, U0TXD, U0CTS, U0RTS, U0DTR),
+        (1, UART1, Uart1, U1RXD, U1TXD, U1CTS, U1RTS, U1DTR)));
     };
 }
 /// This macro can be used to generate code for each peripheral instance of the SPI master driver.
