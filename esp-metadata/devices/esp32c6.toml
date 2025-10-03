@@ -2,7 +2,7 @@
 #
 # Empty [`device.driver`] tables imply `partial` support status.
 #
-# If you modify a driver support status, run `cargo xtask update-chip-support-table` to
+# If you modify a driver support status, run `cargo xtask update-metadata` to
 # update the table in the esp-hal README.
 
 [device]
@@ -89,6 +89,7 @@ peripherals = [
 
     { name = "ADC1", virtual = true },
     { name = "BT", virtual = true },
+    { name = "FLASH", virtual = true },
     { name = "LP_CORE", virtual = true },
     { name = "SW_INTERRUPT", virtual = true },
     { name = "TSENS", virtual = true },
@@ -124,9 +125,6 @@ symbols = [
     "gpio_support_deepsleep_wakeup",
     "uart_support_wakeup_int",
     "pm_support_ext1_wakeup",
-
-    # Which bluetooth implementation
-    "npl",
 ]
 
 memory = [{ name = "dram", start = 0x4080_0000, end = 0x4088_0000 }]
@@ -190,13 +188,7 @@ pins = [
     { pin = 21, functions = { 0 = "SDIO_DATA1", 2 = "FSPICS5" } },
     { pin = 22, functions = { 0 = "SDIO_DATA2" } },
     { pin = 23, functions = { 0 = "SDIO_DATA3" } },
-    { pin = 24, functions = { 0 = "SPICS0" } },
-    { pin = 25, functions = { 0 = "SPIQ" } },
-    { pin = 26, functions = { 0 = "SPIWP" } },
     { pin = 27 },
-    { pin = 28, functions = { 0 = "SPIHD" } },
-    { pin = 29, functions = { 0 = "SPICLK" } },
-    { pin = 30, functions = { 0 = "SPID" } },
 ]
 input_signals = [
     { name = "EXT_ADC_START",       id = 0 },
@@ -463,6 +455,16 @@ support_status = "partial"
 ram_start = 0x60006400
 channel_ram_size = 48
 channels = ["Tx", "Tx", "Rx", "Rx"]
+has_tx_immediate_stop = true
+has_tx_loop_count = true
+has_tx_loop_auto_stop = true
+has_tx_carrier_data_only = true
+has_tx_sync = true
+has_rx_wrap = true
+has_rx_demodulation = true
+clock_sources.supported = [ "None", "Pll80MHz", "RcFast", "Xtal" ]
+clock_sources.default = "Pll80MHz"
+max_idle_threshold = 0x3FFF
 
 [device.rsa]
 support_status = "partial"
@@ -508,10 +510,6 @@ ram_size = 32
 [device.ds]
 support_status = "not_supported"
 
-[device.wifi]
-support_status = "partial"
-has_wifi6 = true
-
 [device.rng]
 support_status = "partial"
 apb_cycle_wait_num = 16 # TODO
@@ -542,7 +540,15 @@ apb_cycle_wait_num = 16 # TODO
 [device.ulp_riscv]
 
 ## Radio
+[device.wifi]
+support_status = "partial"
+has_wifi6 = true
+
 [device.bt]
+support_status = "partial"
+controller = "npl"
+
 [device.ieee802154]
+
 [device.phy]
 combo_module = true

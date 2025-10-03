@@ -183,6 +183,39 @@ macro_rules! property {
     ("rmt.channel_ram_size", str) => {
         stringify!(48)
     };
+    ("rmt.has_tx_immediate_stop") => {
+        true
+    };
+    ("rmt.has_tx_loop_count") => {
+        true
+    };
+    ("rmt.has_tx_loop_auto_stop") => {
+        true
+    };
+    ("rmt.has_tx_carrier_data_only") => {
+        true
+    };
+    ("rmt.has_tx_sync") => {
+        true
+    };
+    ("rmt.has_rx_wrap") => {
+        true
+    };
+    ("rmt.has_rx_demodulation") => {
+        true
+    };
+    ("rmt.has_dma") => {
+        false
+    };
+    ("rmt.has_per_channel_clock") => {
+        false
+    };
+    ("rmt.max_idle_threshold") => {
+        16383
+    };
+    ("rmt.max_idle_threshold", str) => {
+        stringify!(16383)
+    };
     ("rng.apb_cycle_wait_num") => {
         16
     };
@@ -230,6 +263,9 @@ macro_rules! property {
     };
     ("uart.ram_size", str) => {
         stringify!(128)
+    };
+    ("bt.controller") => {
+        "npl"
     };
     ("phy.combo_module") => {
         false
@@ -292,6 +328,16 @@ macro_rules! for_each_rmt_channel {
         _for_each_inner!((2, 0)); _for_each_inner!((3, 1)); _for_each_inner!((all(0),
         (1), (2), (3))); _for_each_inner!((tx(0, 0), (1, 1))); _for_each_inner!((rx(2,
         0), (3, 1)));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_rmt_clock_source {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner { $(($pattern) => $code;)* ($other : tt) => {} }
+        _for_each_inner!((Xtal, 0)); _for_each_inner!((RcFast, 1));
+        _for_each_inner!((Xtal)); _for_each_inner!((all(Xtal, 0), (RcFast, 1)));
+        _for_each_inner!((default(Xtal))); _for_each_inner!((is_boolean));
     };
 }
 #[macro_export]
@@ -506,7 +552,6 @@ macro_rules! for_each_peripheral {
         _for_each_inner!((GPIO0 <= virtual())); _for_each_inner!((GPIO1 <= virtual()));
         _for_each_inner!((GPIO2 <= virtual())); _for_each_inner!((GPIO3 <= virtual()));
         _for_each_inner!((GPIO4 <= virtual())); _for_each_inner!((GPIO5 <= virtual()));
-        _for_each_inner!((GPIO6 <= virtual())); _for_each_inner!((GPIO7 <= virtual()));
         _for_each_inner!((GPIO8 <= virtual())); _for_each_inner!((GPIO9 <= virtual()));
         _for_each_inner!((GPIO10 <= virtual())); _for_each_inner!((GPIO11 <= virtual()));
         _for_each_inner!((GPIO12 <= virtual())); _for_each_inner!((GPIO13 <= virtual()));
@@ -571,10 +616,10 @@ macro_rules! for_each_peripheral {
         (unstable))); _for_each_inner!((DMA_CH1 <= virtual() (unstable)));
         _for_each_inner!((DMA_CH2 <= virtual() (unstable))); _for_each_inner!((ADC1 <=
         virtual() (unstable))); _for_each_inner!((BT <= virtual() (unstable)));
-        _for_each_inner!((SW_INTERRUPT <= virtual() (unstable)));
-        _for_each_inner!((MEM2MEM1 <= virtual() (unstable))); _for_each_inner!((MEM2MEM4
-        <= virtual() (unstable))); _for_each_inner!((MEM2MEM5 <= virtual() (unstable)));
-        _for_each_inner!((MEM2MEM10 <= virtual() (unstable)));
+        _for_each_inner!((FLASH <= virtual() (unstable))); _for_each_inner!((SW_INTERRUPT
+        <= virtual() (unstable))); _for_each_inner!((MEM2MEM1 <= virtual() (unstable)));
+        _for_each_inner!((MEM2MEM4 <= virtual() (unstable))); _for_each_inner!((MEM2MEM5
+        <= virtual() (unstable))); _for_each_inner!((MEM2MEM10 <= virtual() (unstable)));
         _for_each_inner!((MEM2MEM11 <= virtual() (unstable)));
         _for_each_inner!((MEM2MEM12 <= virtual() (unstable)));
         _for_each_inner!((MEM2MEM13 <= virtual() (unstable)));
@@ -582,22 +627,21 @@ macro_rules! for_each_peripheral {
         _for_each_inner!((MEM2MEM15 <= virtual() (unstable)));
         _for_each_inner!((all(GPIO0 <= virtual()), (GPIO1 <= virtual()), (GPIO2 <=
         virtual()), (GPIO3 <= virtual()), (GPIO4 <= virtual()), (GPIO5 <= virtual()),
-        (GPIO6 <= virtual()), (GPIO7 <= virtual()), (GPIO8 <= virtual()), (GPIO9 <=
-        virtual()), (GPIO10 <= virtual()), (GPIO11 <= virtual()), (GPIO12 <= virtual()),
-        (GPIO13 <= virtual()), (GPIO14 <= virtual()), (GPIO22 <= virtual()), (GPIO23 <=
-        virtual()), (GPIO24 <= virtual()), (GPIO25 <= virtual()), (GPIO26 <= virtual()),
-        (GPIO27 <= virtual()), (AES <= AES(AES : { bind_peri_interrupt,
-        enable_peri_interrupt, disable_peri_interrupt }) (unstable)), (APB_SARADC <=
-        APB_SARADC() (unstable)), (ASSIST_DEBUG <= ASSIST_DEBUG() (unstable)), (DMA <=
-        DMA() (unstable)), (DS <= DS() (unstable)), (ECC <= ECC() (unstable)), (EFUSE <=
-        EFUSE() (unstable)), (GPIO <= GPIO() (unstable)), (GPIO_SD <= GPIO_SD()
-        (unstable)), (HMAC <= HMAC() (unstable)), (HP_APM <= HP_APM() (unstable)),
-        (HP_SYS <= HP_SYS() (unstable)), (I2C_ANA_MST <= I2C_ANA_MST() (unstable)), (I2C0
-        <= I2C0(I2C_EXT0 : { bind_peri_interrupt, enable_peri_interrupt,
-        disable_peri_interrupt })), (I2C1 <= I2C1(I2C_EXT1 : { bind_peri_interrupt,
-        enable_peri_interrupt, disable_peri_interrupt })), (I2S0 <= I2S0(I2S0 : {
+        (GPIO8 <= virtual()), (GPIO9 <= virtual()), (GPIO10 <= virtual()), (GPIO11 <=
+        virtual()), (GPIO12 <= virtual()), (GPIO13 <= virtual()), (GPIO14 <= virtual()),
+        (GPIO22 <= virtual()), (GPIO23 <= virtual()), (GPIO24 <= virtual()), (GPIO25 <=
+        virtual()), (GPIO26 <= virtual()), (GPIO27 <= virtual()), (AES <= AES(AES : {
         bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
-        (unstable)), (IEEE802154 <= IEEE802154() (unstable)), (INTERRUPT_CORE0 <=
+        (unstable)), (APB_SARADC <= APB_SARADC() (unstable)), (ASSIST_DEBUG <=
+        ASSIST_DEBUG() (unstable)), (DMA <= DMA() (unstable)), (DS <= DS() (unstable)),
+        (ECC <= ECC() (unstable)), (EFUSE <= EFUSE() (unstable)), (GPIO <= GPIO()
+        (unstable)), (GPIO_SD <= GPIO_SD() (unstable)), (HMAC <= HMAC() (unstable)),
+        (HP_APM <= HP_APM() (unstable)), (HP_SYS <= HP_SYS() (unstable)), (I2C_ANA_MST <=
+        I2C_ANA_MST() (unstable)), (I2C0 <= I2C0(I2C_EXT0 : { bind_peri_interrupt,
+        enable_peri_interrupt, disable_peri_interrupt })), (I2C1 <= I2C1(I2C_EXT1 : {
+        bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })), (I2S0 <=
+        I2S0(I2S0 : { bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt
+        }) (unstable)), (IEEE802154 <= IEEE802154() (unstable)), (INTERRUPT_CORE0 <=
         INTERRUPT_CORE0() (unstable)), (INTPRI <= INTPRI() (unstable)), (IO_MUX <=
         IO_MUX() (unstable)), (LEDC <= LEDC() (unstable)), (LPWR <= LP_CLKRST()
         (unstable)), (LP_ANA <= LP_ANA() (unstable)), (LP_AON <= LP_AON() (unstable)),
@@ -626,12 +670,12 @@ macro_rules! for_each_peripheral {
         bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
         (unstable)), (DMA_CH0 <= virtual() (unstable)), (DMA_CH1 <= virtual()
         (unstable)), (DMA_CH2 <= virtual() (unstable)), (ADC1 <= virtual() (unstable)),
-        (BT <= virtual() (unstable)), (SW_INTERRUPT <= virtual() (unstable)), (MEM2MEM1
-        <= virtual() (unstable)), (MEM2MEM4 <= virtual() (unstable)), (MEM2MEM5 <=
-        virtual() (unstable)), (MEM2MEM10 <= virtual() (unstable)), (MEM2MEM11 <=
-        virtual() (unstable)), (MEM2MEM12 <= virtual() (unstable)), (MEM2MEM13 <=
-        virtual() (unstable)), (MEM2MEM14 <= virtual() (unstable)), (MEM2MEM15 <=
-        virtual() (unstable))));
+        (BT <= virtual() (unstable)), (FLASH <= virtual() (unstable)), (SW_INTERRUPT <=
+        virtual() (unstable)), (MEM2MEM1 <= virtual() (unstable)), (MEM2MEM4 <= virtual()
+        (unstable)), (MEM2MEM5 <= virtual() (unstable)), (MEM2MEM10 <= virtual()
+        (unstable)), (MEM2MEM11 <= virtual() (unstable)), (MEM2MEM12 <= virtual()
+        (unstable)), (MEM2MEM13 <= virtual() (unstable)), (MEM2MEM14 <= virtual()
+        (unstable)), (MEM2MEM15 <= virtual() (unstable))));
     };
 }
 /// This macro can be used to generate code for each `GPIOn` instance.
@@ -671,33 +715,30 @@ macro_rules! for_each_gpio {
         [Output]))); _for_each_inner!((3, GPIO3(_0 => MTDI _2 => FSPIHD) (_2 => FSPIHD)
         ([Input] [Output]))); _for_each_inner!((4, GPIO4(_0 => MTCK _2 => FSPICLK) (_2 =>
         FSPICLK) ([Input] [Output]))); _for_each_inner!((5, GPIO5(_2 => FSPID) (_0 =>
-        MTDO _2 => FSPID) ([Input] [Output]))); _for_each_inner!((6, GPIO6() () ([Input]
-        [Output]))); _for_each_inner!((7, GPIO7() () ([Input] [Output])));
-        _for_each_inner!((8, GPIO8() () ([Input] [Output]))); _for_each_inner!((9,
-        GPIO9() () ([Input] [Output]))); _for_each_inner!((10, GPIO10() () ([Input]
-        [Output]))); _for_each_inner!((11, GPIO11() () ([Input] [Output])));
-        _for_each_inner!((12, GPIO12() () ([Input] [Output]))); _for_each_inner!((13,
-        GPIO13() () ([Input] [Output]))); _for_each_inner!((14, GPIO14() () ([Input]
-        [Output]))); _for_each_inner!((22, GPIO22() () ([Input] [Output])));
-        _for_each_inner!((23, GPIO23(_0 => U0RXD) (_2 => FSPICS1) ([Input] [Output])));
-        _for_each_inner!((24, GPIO24() (_0 => U0TXD _2 => FSPICS2) ([Input] [Output])));
-        _for_each_inner!((25, GPIO25() (_2 => FSPICS3) ([Input] [Output])));
-        _for_each_inner!((26, GPIO26() (_2 => FSPICS4) ([Input] [Output])));
-        _for_each_inner!((27, GPIO27() (_2 => FSPICS5) ([Input] [Output])));
+        MTDO _2 => FSPID) ([Input] [Output]))); _for_each_inner!((8, GPIO8() () ([Input]
+        [Output]))); _for_each_inner!((9, GPIO9() () ([Input] [Output])));
+        _for_each_inner!((10, GPIO10() () ([Input] [Output]))); _for_each_inner!((11,
+        GPIO11() () ([Input] [Output]))); _for_each_inner!((12, GPIO12() () ([Input]
+        [Output]))); _for_each_inner!((13, GPIO13() () ([Input] [Output])));
+        _for_each_inner!((14, GPIO14() () ([Input] [Output]))); _for_each_inner!((22,
+        GPIO22() () ([Input] [Output]))); _for_each_inner!((23, GPIO23(_0 => U0RXD) (_2
+        => FSPICS1) ([Input] [Output]))); _for_each_inner!((24, GPIO24() (_0 => U0TXD _2
+        => FSPICS2) ([Input] [Output]))); _for_each_inner!((25, GPIO25() (_2 => FSPICS3)
+        ([Input] [Output]))); _for_each_inner!((26, GPIO26() (_2 => FSPICS4) ([Input]
+        [Output]))); _for_each_inner!((27, GPIO27() (_2 => FSPICS5) ([Input] [Output])));
         _for_each_inner!((all(0, GPIO0(_2 => FSPIQ) (_2 => FSPIQ) ([Input] [Output])),
         (1, GPIO1(_2 => FSPICS0) (_2 => FSPICS0) ([Input] [Output])), (2, GPIO2(_0 =>
         MTMS _2 => FSPIWP) (_2 => FSPIWP) ([Input] [Output])), (3, GPIO3(_0 => MTDI _2 =>
         FSPIHD) (_2 => FSPIHD) ([Input] [Output])), (4, GPIO4(_0 => MTCK _2 => FSPICLK)
         (_2 => FSPICLK) ([Input] [Output])), (5, GPIO5(_2 => FSPID) (_0 => MTDO _2 =>
-        FSPID) ([Input] [Output])), (6, GPIO6() () ([Input] [Output])), (7, GPIO7() ()
-        ([Input] [Output])), (8, GPIO8() () ([Input] [Output])), (9, GPIO9() () ([Input]
-        [Output])), (10, GPIO10() () ([Input] [Output])), (11, GPIO11() () ([Input]
-        [Output])), (12, GPIO12() () ([Input] [Output])), (13, GPIO13() () ([Input]
-        [Output])), (14, GPIO14() () ([Input] [Output])), (22, GPIO22() () ([Input]
-        [Output])), (23, GPIO23(_0 => U0RXD) (_2 => FSPICS1) ([Input] [Output])), (24,
-        GPIO24() (_0 => U0TXD _2 => FSPICS2) ([Input] [Output])), (25, GPIO25() (_2 =>
-        FSPICS3) ([Input] [Output])), (26, GPIO26() (_2 => FSPICS4) ([Input] [Output])),
-        (27, GPIO27() (_2 => FSPICS5) ([Input] [Output]))));
+        FSPID) ([Input] [Output])), (8, GPIO8() () ([Input] [Output])), (9, GPIO9() ()
+        ([Input] [Output])), (10, GPIO10() () ([Input] [Output])), (11, GPIO11() ()
+        ([Input] [Output])), (12, GPIO12() () ([Input] [Output])), (13, GPIO13() ()
+        ([Input] [Output])), (14, GPIO14() () ([Input] [Output])), (22, GPIO22() ()
+        ([Input] [Output])), (23, GPIO23(_0 => U0RXD) (_2 => FSPICS1) ([Input]
+        [Output])), (24, GPIO24() (_0 => U0TXD _2 => FSPICS2) ([Input] [Output])), (25,
+        GPIO25() (_2 => FSPICS3) ([Input] [Output])), (26, GPIO26() (_2 => FSPICS4)
+        ([Input] [Output])), (27, GPIO27() (_2 => FSPICS5) ([Input] [Output]))));
     };
 }
 /// This macro can be used to generate code for each analog function of each GPIO.

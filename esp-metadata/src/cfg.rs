@@ -40,6 +40,8 @@ pub(crate) enum Value {
     Number(u32),
     /// A boolean value. If true, the value is included in the cfg symbols.
     Boolean(bool),
+    /// A string.
+    String(String),
     /// A list of numeric values. A for-each macro is generated for the list.
     NumberList(Vec<u32>),
     /// A list of strings. A separate symbol is generated for each string.
@@ -116,6 +118,7 @@ macro_rules! driver_configs {
     (@ignore $t:tt) => {};
     (@property (u32)           $self:ident, $config:ident) => { Value::Number($self.$config) };
     (@property (bool)          $self:ident, $config:ident) => { Value::Boolean($self.$config) };
+    (@property (String)        $self:ident, $config:ident) => { Value::String($self.$config.clone()) };
     (@property (Vec<u32>)      $self:ident, $config:ident) => { Value::NumberList($self.$config.clone()) };
     (@property (Vec<String>)   $self:ident, $config:ident) => { Value::StringList($self.$config.clone()) };
     (@property (Option<u32>)   $self:ident, $config:ident) => { Value::from($self.$config) };
@@ -477,6 +480,26 @@ driver_configs![
             ram_start: u32,
             channel_ram_size: u32,
             channels: RmtChannelConfig,
+            #[serde(default)]
+            has_tx_immediate_stop: bool,
+            #[serde(default)]
+            has_tx_loop_count: bool,
+            #[serde(default)]
+            has_tx_loop_auto_stop: bool,
+            #[serde(default)]
+            has_tx_carrier_data_only: bool,
+            #[serde(default)]
+            has_tx_sync: bool,
+            #[serde(default)]
+            has_rx_wrap: bool,
+            #[serde(default)]
+            has_rx_demodulation: bool,
+            #[serde(default)]
+            has_dma: bool,
+            #[serde(default)]
+            has_per_channel_clock: bool,
+            clock_sources: RmtClockSourcesConfig,
+            max_idle_threshold: u32,
         }
     },
     RngProperties {
@@ -612,7 +635,9 @@ driver_configs![
     BluetoothProperties {
         driver: bt,
         name: "Bluetooth",
-        properties: {}
+        properties: {
+            controller: String,
+        }
     },
     IeeeProperties {
         driver: ieee802154,

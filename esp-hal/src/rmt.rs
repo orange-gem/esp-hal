@@ -213,6 +213,7 @@ use crate::{
     Async,
     Blocking,
     asynch::AtomicWaker,
+    clock::Clocks,
     gpio::{
         self,
         InputConfig,
@@ -257,6 +258,28 @@ pub enum Error {
     MemoryBlockNotAvailable,
 }
 
+impl core::error::Error for Error {}
+
+impl core::fmt::Display for Error {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Error::UnreachableTargetFrequency => {
+                write!(f, "The desired frequency is impossible to reach")
+            }
+            Error::Overflow => write!(f, "The amount of pulses exceeds the size of the FIFO"),
+            Error::InvalidArgument => write!(f, "An argument is invalid"),
+            Error::TransmissionError => write!(f, "An error occurred during transmission"),
+            Error::EndMarkerMissing => write!(f, "No transmission end marker found"),
+            Error::InvalidMemsize => write!(f, "Memsize is not correct,"),
+            Error::InvalidDataLength => write!(f, "The data length is invalid"),
+            Error::ReceiverError => write!(f, "Receiver error most likely RMT memory overflow"),
+            Error::MemoryBlockNotAvailable => {
+                write!(f, "Memory block is not available for channel")
+            }
+        }
+    }
+}
+
 /// Convenience newtype to work with pulse codes.
 ///
 /// A [`PulseCode`] is represented as `u32`, with fields laid out as follows:
@@ -289,33 +312,70 @@ const LEVEL1_MASK: u32 = 1 << LEVEL1_SHIFT;
 const LEVEL2_MASK: u32 = 1 << LEVEL2_SHIFT;
 
 impl PulseCode {
+    /// Maximum value for the `length1` and `length2` fields.
+    pub const MAX_LEN: u16 = 0x7FFF;
+
+    /// Create a new instance.
+    ///
+    /// Panics if `length1` or `length2` exceed the maximum representable range.
+    #[inline]
+    pub const fn new(level1: Level, length1: u16, level2: Level, length2: u16) -> Self {
+        if length1 > Self::MAX_LEN || length2 > Self::MAX_LEN {
+            // defmt::panic! fails const eval
+            core::panic!("PulseCode length out of range");
+        };
+
+        // SAFETY:
+        // - We just checked that length1 and length2 are in range
+        unsafe { Self::new_unchecked(level1, length1, level2, length2) }
+    }
+
     /// Create a new instance.
     ///
     /// If `length1` or `length2` exceed the maximum representable range, they
-    /// will be clamped to `0x7FFF`.
+    /// will be clamped to `Self::MAX_LEN`.
     #[inline]
-    pub const fn new(level1: Level, length1: u16, level2: Level, length2: u16) -> Self {
-        // Can't use lengthX.min(0x7FFF) since it is not const
-        let length1 = if length1 >= 0x8000 { 0x7FFF } else { length1 };
-        let length2 = if length2 >= 0x8000 { 0x7FFF } else { length2 };
+    pub const fn new_clamped(level1: Level, length1: u16, level2: Level, length2: u16) -> Self {
+        // Can't use lengthX.min(Self::MAX_LEN) since it is not const
+        let length1 = if length1 > Self::MAX_LEN {
+            Self::MAX_LEN
+        } else {
+            length1
+        };
+        let length2 = if length2 > Self::MAX_LEN {
+            Self::MAX_LEN
+        } else {
+            length2
+        };
 
         // SAFETY:
         // - We just clamped length1 and length2 to the required intervals
         unsafe { Self::new_unchecked(level1, length1, level2, length2) }
     }
 
-    /// Create a new instance.
+    /// Create a new instance, attempting to convert lengths to `u16` first.
     ///
-    /// If `length1` or `length2` exceed the maximum representable range, this
-    /// will return `None`.
+    /// This is slightly more convenient when passing in longer integers (e.g. `u32`) resulting from
+    /// a preceding calculation.
+    ///
+    /// If `length1` or `length2` fail to convert to `u16` or exceed the maximum representable
+    /// range, this will return `None`.
     #[inline]
-    pub const fn try_new(level1: Level, length1: u16, level2: Level, length2: u16) -> Option<Self> {
-        if length1 >= 0x8000 || length2 >= 0x8000 {
+    pub fn try_new(
+        level1: Level,
+        length1: impl TryInto<u16>,
+        level2: Level,
+        length2: impl TryInto<u16>,
+    ) -> Option<Self> {
+        let (Ok(length1), Ok(length2)) = (length1.try_into(), length2.try_into()) else {
+            return None;
+        };
+        if length1 > Self::MAX_LEN || length2 >= Self::MAX_LEN {
             return None;
         }
 
         // SAFETY:
-        // - We just checked that length1 and length2 have their MSB cleared.
+        // - We just checked that length1 and length2 are in range
         Some(unsafe { Self::new_unchecked(level1, length1, level2, length2) })
     }
 
@@ -407,7 +467,7 @@ impl PulseCode {
     /// Returns `None` if `length` exceeds the representable range.
     #[inline]
     pub const fn with_length1(mut self, length: u16) -> Option<Self> {
-        if length >= 0x8000 {
+        if length > Self::MAX_LEN {
             return None;
         }
 
@@ -421,7 +481,7 @@ impl PulseCode {
     /// Returns `None` if `length` exceeds the representable range.
     #[inline]
     pub const fn with_length2(mut self, length: u16) -> Option<Self> {
-        if length >= 0x8000 {
+        if length > Self::MAX_LEN {
             return None;
         }
 
@@ -788,7 +848,7 @@ impl<'d> Rmt<'d, Blocking> {
     /// Create a new RMT instance
     pub fn new(peripheral: RMT<'d>, frequency: Rate) -> Result<Self, Error> {
         let this = Rmt::create(peripheral);
-        self::chip_specific::configure_clock(frequency)?;
+        self::chip_specific::configure_clock(ClockSource::default(), frequency)?;
         Ok(this)
     }
 
@@ -1032,13 +1092,7 @@ where
 
         let _guard = GenericPeripheralGuard::new();
 
-        let threshold = if cfg!(any(esp32, esp32s2)) {
-            0b111_1111_1111_1111
-        } else {
-            0b11_1111_1111_1111
-        };
-
-        if config.idle_threshold > threshold {
+        if config.idle_threshold > property!("rmt.max_idle_threshold") {
             return Err(Error::InvalidArgument);
         }
 
@@ -1661,6 +1715,62 @@ impl DynChannelAccess<Rx> {
     }
 }
 
+for_each_rmt_clock_source!(
+    (all $(($name:ident, $bits:literal)),+) => {
+        #[derive(Clone, Copy, Debug)]
+        #[repr(u8)]
+        enum ClockSource {
+            $(
+                #[allow(unused)]
+                $name = $bits,
+            )+
+        }
+    };
+
+    (is_boolean) => {
+        impl ClockSource {
+            fn bit(self) -> bool {
+                match (self as u8) {
+                    0 => false,
+                    1 => true,
+                    _ => unreachable!("should be removed by the compiler!"),
+                }
+            }
+        }
+    };
+
+    (default ($name:ident)) => {
+        impl ClockSource {
+            fn default() -> Self {
+                Self::$name
+            }
+
+            fn bits(self) -> u8 {
+                self as u8
+            }
+
+            fn freq(self) -> crate::time::Rate {
+                match self {
+                    #[cfg(rmt_supports_apb_clock)]
+                    ClockSource::Apb => Clocks::get().apb_clock,
+
+                    #[cfg(rmt_supports_rcfast_clock)]
+                    ClockSource::RcFast => todo!(),
+
+                    #[cfg(rmt_supports_xtal_clock)]
+                    ClockSource::Xtal => Clocks::get().xtal_clock,
+
+                    #[cfg(rmt_supports_pll80mhz_clock)]
+                    ClockSource::Pll80MHz => Rate::from_mhz(80),
+
+                    #[cfg(rmt_supports_reftick_clock)]
+                    ClockSource::RefTick => todo!(),
+                }
+            }
+        }
+    };
+);
+
 #[cfg(not(any(esp32, esp32s2)))]
 mod chip_specific {
     use enumset::EnumSet;
@@ -1668,6 +1778,7 @@ mod chip_specific {
     use super::{
         CHANNEL_INDEX_COUNT,
         ChannelIndex,
+        ClockSource,
         Direction,
         DynChannelAccess,
         Error,
@@ -1680,8 +1791,8 @@ mod chip_specific {
     };
     use crate::{peripherals::RMT, time::Rate};
 
-    pub(super) fn configure_clock(frequency: Rate) -> Result<(), Error> {
-        let src_clock = crate::soc::constants::RMT_CLOCK_SRC_FREQ;
+    pub(super) fn configure_clock(source: ClockSource, frequency: Rate) -> Result<(), Error> {
+        let src_clock = source.freq();
 
         if frequency > src_clock {
             return Err(Error::UnreachableTargetFrequency);
@@ -1695,7 +1806,7 @@ mod chip_specific {
         {
             RMT::regs().sys_conf().modify(|_, w| unsafe {
                 w.clk_en().clear_bit();
-                w.sclk_sel().bits(crate::soc::constants::RMT_CLOCK_SRC);
+                w.sclk_sel().bits(source.bits());
                 w.sclk_div_num().bits(div);
                 w.sclk_div_a().bits(0);
                 w.sclk_div_b().bits(0);
@@ -1715,11 +1826,11 @@ mod chip_specific {
             #[cfg(esp32c6)]
             PCR::regs()
                 .rmt_sclk_conf()
-                .modify(|_, w| unsafe { w.sclk_sel().bits(crate::soc::constants::RMT_CLOCK_SRC) });
+                .modify(|_, w| unsafe { w.sclk_sel().bits(source.bits()) });
             #[cfg(not(esp32c6))]
             PCR::regs()
                 .rmt_sclk_conf()
-                .modify(|_, w| w.sclk_sel().bit(crate::soc::constants::RMT_CLOCK_SRC));
+                .modify(|_, w| w.sclk_sel().bit(source.bit()));
 
             RMT::regs()
                 .sys_conf()
@@ -2097,6 +2208,7 @@ mod chip_specific {
 
     use super::{
         ChannelIndex,
+        ClockSource,
         Direction,
         DynChannelAccess,
         Error,
@@ -2111,8 +2223,8 @@ mod chip_specific {
     };
     use crate::{peripherals::RMT, time::Rate};
 
-    pub(super) fn configure_clock(frequency: Rate) -> Result<(), Error> {
-        if frequency != Rate::from_mhz(80) {
+    pub(super) fn configure_clock(source: ClockSource, frequency: Rate) -> Result<(), Error> {
+        if frequency != source.freq() {
             return Err(Error::UnreachableTargetFrequency);
         }
 
@@ -2120,7 +2232,7 @@ mod chip_specific {
 
         for ch_num in 0..NUM_CHANNELS {
             rmt.chconf1(ch_num)
-                .modify(|_, w| w.ref_always_on().set_bit());
+                .modify(|_, w| w.ref_always_on().bit(source.bit()));
         }
 
         rmt.apb_conf().modify(|_, w| w.apb_fifo_mask().set_bit());
@@ -2201,7 +2313,7 @@ mod chip_specific {
     }
 
     impl DynChannelAccess<Tx> {
-        #[cfg(not(esp32))]
+        #[cfg(rmt_has_tx_loop_count)]
         #[inline]
         pub fn set_generate_repeat_interrupt(&self, loopcount: Option<LoopCount>) {
             let rmt = crate::peripherals::RMT::regs();
@@ -2215,7 +2327,7 @@ mod chip_specific {
                 .modify(|_, w| unsafe { w.tx_loop_num().bits(repeats) });
         }
 
-        #[cfg(esp32)]
+        #[cfg(not(rmt_has_tx_loop_count))]
         #[inline]
         pub fn set_generate_repeat_interrupt(&self, _loopcount: Option<LoopCount>) {
             // unsupported
@@ -2329,7 +2441,7 @@ mod chip_specific {
         // Returns whether stopping was immediate, or needs to wait for tx end
         // Due to inlining, the compiler should be able to eliminate code in the caller that
         // depends on this.
-        #[cfg(esp32s2)]
+        #[cfg(rmt_has_tx_immediate_stop)]
         #[inline]
         pub fn stop_tx(&self) -> bool {
             let rmt = crate::peripherals::RMT::regs();
@@ -2338,7 +2450,7 @@ mod chip_specific {
             true
         }
 
-        #[cfg(esp32)]
+        #[cfg(not(rmt_has_tx_immediate_stop))]
         #[inline]
         pub fn stop_tx(&self) -> bool {
             let ptr = self.channel_ram_start();
