@@ -778,6 +778,23 @@ where
         self
     }
 
+    /// Assign the DTR pin for UART instance.
+    ///
+    /// Sets the specified pin to input and connects it to the UART DTR signal.
+    #[instability::unstable]
+    pub fn with_dtr(self, dtr: impl PeripheralOutput<'d>) -> Self {
+        let dtr = dtr.into();
+
+        dtr.apply_input_config(&InputConfig::default());
+        dtr.set_input_enable(true);
+
+        self.uart.info().dtr_signal.connect_to(&dtr);
+
+        self
+    }
+
+
+
     /// Assign the TX pin for UART instance.
     ///
     /// Sets the specified pin to push-pull output and connects it to the UART
@@ -1790,6 +1807,25 @@ where
     /// ```
     pub fn with_rts(mut self, rts: impl PeripheralOutput<'d>) -> Self {
         self.tx = self.tx.with_rts(rts);
+        self
+    }
+
+    #[procmacros::doc_replace]
+    /// Configure DTR pin
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    /// # {before_snippet}
+    /// use esp_hal::uart::{Config, Uart};
+    /// let uart = Uart::new(peripherals.UART0, Config::default())?
+    ///     .with_tx(peripherals.GPIO2)
+    ///     .with_dtr(peripherals.GPIO4);
+    ///
+    /// # {after_snippet}
+    /// ```
+    pub fn with_dtr(mut self, dtr: impl PeripheralOutput<'d>) -> Self {
+        self.tx = self.tx.with_dtr(dtr);
         self
     }
 
@@ -2925,6 +2961,9 @@ pub struct Info {
 
     /// RTS (Request to Send) pin
     pub rts_signal: OutputSignal,
+
+    /// DTR () pin
+    pub dtr_signal: OutputSignal,
 }
 
 /// Peripheral state for a UART instance.
@@ -3679,7 +3718,7 @@ impl PartialEq for Info {
 unsafe impl Sync for Info {}
 
 for_each_uart! {
-    ($inst:ident, $peri:ident, $rxd:ident, $txd:ident, $cts:ident, $rts:ident) => {
+    ($inst:ident, $peri:ident, $rxd:ident, $txd:ident, $cts:ident, $rts:ident, $dtr:ident) => {
         impl Instance for crate::peripherals::$inst<'_> {
             fn parts(&self) -> (&'static Info, &'static State) {
                 #[crate::handler]
@@ -3704,6 +3743,7 @@ for_each_uart! {
                     rx_signal: InputSignal::$rxd,
                     cts_signal: InputSignal::$cts,
                     rts_signal: OutputSignal::$rts,
+                    dtr_signal: OutputSignal::$dtr,
                 };
                 (&PERIPHERAL, &STATE)
             }
